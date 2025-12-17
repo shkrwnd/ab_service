@@ -19,24 +19,23 @@ def create_event_endpoint(
     db: Session = Depends(get_db),
     token: str = Depends(verify_token)
 ):
-    """
-    Record one or more events.
-    Can accept a single event object or an array of events for batch processing.
-    """
     # If input is list, treat as batch
+    # (fastapi will parse json array into python list)
     if isinstance(event_data, list):
         # Batch creation
         events = create_events_batch(db, event_data)
-        return [EventResponse(
-            id=e.id,
-            user_id=e.user_id,
-            event_type=e.event_type,
-            timestamp=e.timestamp,
-            properties=e.properties,
-            experiment_id=e.experiment_id
-        ) for e in events]
+        out = []
+        for e in events:
+            out.append(EventResponse(
+                id=e.id,
+                user_id=e.user_id,
+                event_type=e.event_type,
+                timestamp=e.timestamp,
+                properties=e.properties,
+                experiment_id=e.experiment_id
+            ))
+        return out
     else:
-        # Single event
         event = create_event(db, event_data)
         return EventResponse(
             id=event.id,

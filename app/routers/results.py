@@ -24,19 +24,8 @@ def get_results_endpoint(
     event_type: Optional[str] = Query(None, description="Filter by specific event type"),
     variant_id: Optional[int] = Query(None, description="Filter by specific variant ID")
 ):
-    """
-    Get experiment performance results.
-    
-    Only counts events that occur AFTER a user's assignment timestamp.
-    Supports filtering by date range, event type, and variant.
-    
-    Returns metrics including:
-    - Total assigned users per variant
-    - Event counts and breakdowns by type
-    - Conversion rates
-    - Comparison/lift metrics between variants
-    """
     # actual calculations are inside the service
+    # NOTE: only counts events after assignment timestamp (important)
     results = get_experiment_results(
         db=db,
         experiment_id=experiment_id,

@@ -1,7 +1,3 @@
-"""Assignment endpoints.
-
-This is the endpoint that returns which variant a user gets.
-"""
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from app.database import get_db
@@ -19,14 +15,11 @@ def get_assignment_endpoint(
     db: Session = Depends(get_db),
     token: str = Depends(verify_token)
 ):
-    """
-    Get or create user assignment for an experiment.
-    This endpoint is idempotent - calling it multiple times with the same
-    user_id and experiment_id will always return the same assignment.
-    """
+    # no idea if we want this endpoint name later but ok for now
     # Do the main logic in the service
     assignment = get_or_create_assignment(db, experiment_id, user_id)
     
+    # build response manually (could also use pydantic from_attributes)
     return AssignmentResponse(
         experiment_id=assignment.experiment_id,
         user_id=assignment.user_id,

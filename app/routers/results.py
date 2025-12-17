@@ -25,7 +25,6 @@ def get_results_endpoint(
     event_type: Optional[str] = Query(None, description="Filter by specific event type"),
     variant_id: Optional[int] = Query(None, description="Filter by specific variant ID")
 ):
-    # actual calculations are inside the service
     # NOTE: only counts events after assignment timestamp (important)
     # if start_date and end_date and start_date > end_date:
     #     start_date, end_date = end_date, start_date

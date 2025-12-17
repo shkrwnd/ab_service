@@ -19,7 +19,6 @@ def get_assignment_endpoint(
     db: Session = Depends(get_db),
     token: str = Depends(verify_token)
 ):
-    # no idea if we want this endpoint name later but ok for now
     # Do the main logic in the service
     # user_id = user_id.strip()
     assignment = get_or_create_assignment(db, experiment_id, user_id)

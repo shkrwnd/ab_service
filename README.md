@@ -60,6 +60,8 @@ All endpoints require Bearer token authentication. Include the token in the Auth
 Authorization: Bearer your-secret-token-here
 ```
 
+For end-to-end request examples (curl), see `examples/usage.sh`.
+
 ### 1. Create Experiment
 
 ```bash

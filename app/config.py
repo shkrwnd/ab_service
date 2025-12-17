@@ -1,4 +1,7 @@
-"""Configuration management - keeping it simple for now"""
+"""Configuration management.
+
+Reads settings from env vars. This is intentionally simple.
+"""
 import os
 from typing import List
 from dotenv import load_dotenv

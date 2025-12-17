@@ -1,4 +1,9 @@
-"""Service for experiment management"""
+"""Experiment service.
+
+This file has the experiment logic (creating + fetching).
+Probably could be cleaned up later but works for now.
+"""
+
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from app.models import Experiment, Variant
@@ -9,13 +14,16 @@ from app.utils.cache import clear_experiment_cache, get_experiment, set_experime
 def create_experiment(db: Session, experiment_data: ExperimentCreate) -> Experiment:
     """
     Create a new experiment with variants.
-    Validates that traffic percentages sum to 100% (with small tolerance for floating point).
+
+    Stuff we validate:
+    - traffic percentages total should be 100 (give or take float rounding)
+    - should have at least 1 variant
+    - experiment name should not already exist
     """
     # Validate traffic percentages
     total_percentage = sum(v.traffic_percentage for v in experiment_data.variants)
     
-    # Allow small floating point differences (e.g., 99.99 or 100.01)
-    # This prevents issues with floating point precision
+    # Float check, since sometimes it can be 99.999 etc
     if abs(total_percentage - 100.0) > 0.1:
         raise HTTPException(
             status_code=400,
@@ -29,25 +37,26 @@ def create_experiment(db: Session, experiment_data: ExperimentCreate) -> Experim
         )
     
     # Check if experiment name already exists
-    existing = db.query(Experiment).filter(Experiment.name == experiment_data.name).first()
-    if existing:
+    existing_exp = db.query(Experiment).filter(Experiment.name == experiment_data.name).first()
+    if existing_exp:
         raise HTTPException(
             status_code=400,
             detail=f"Experiment with name '{experiment_data.name}' already exists"
         )
     
-    # Create experiment and variants in a transaction
+    # Create experiment and variants in one go
     experiment = Experiment(
         name=experiment_data.name,
         description=experiment_data.description,
-        status="draft"  # Start as draft, can be activated later
+        status="draft"  # start as draft for now
     )
     
     db.add(experiment)
-    db.flush()  # Get the experiment ID
+    db.flush()  # Get the experiment ID (needed for variants)
     
     # Create variants
     for variant_data in experiment_data.variants:
+        # make variant row
         variant = Variant(
             experiment_id=experiment.id,
             name=variant_data.name,
@@ -62,19 +71,18 @@ def create_experiment(db: Session, experiment_data: ExperimentCreate) -> Experim
 
 
 def get_experiment_by_id(db: Session, experiment_id: int) -> Experiment:
-    """Get experiment by ID, with caching"""
+    """Get experiment by id (tries cache first)."""
     # Check cache first
-    cached = get_experiment(experiment_id)
-    if cached:
-        return cached
+    cached_exp = get_experiment(experiment_id)
+    if cached_exp is not None:
+        return cached_exp
     
-    experiment = db.query(Experiment).filter(Experiment.id == experiment_id).first()
-    if not experiment:
+    experiment_obj = db.query(Experiment).filter(Experiment.id == experiment_id).first()
+    if experiment_obj is None:
         raise HTTPException(status_code=404, detail="Experiment not found")
     
     # Cache it
-    from app.utils.cache import set_experiment
-    set_experiment(experiment_id, experiment)
+    set_experiment(experiment_id, experiment_obj)
     
-    return experiment
+    return experiment_obj
 

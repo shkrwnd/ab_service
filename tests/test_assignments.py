@@ -1,4 +1,7 @@
-"""Tests for assignment functionality - focusing on idempotency"""
+"""Tests for assignment functionality.
+
+Main stuff: idempotency and roughly even distribution.
+"""
 import pytest
 from app.models import UserAssignment, Experiment, Variant
 from app.services.assignment_service import get_or_create_assignment

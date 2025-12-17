@@ -1,4 +1,7 @@
-"""Pydantic schemas for request/response validation"""
+"""Pydantic schemas for request/response validation.
+
+These are basically the shapes of request/response payloads.
+"""
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from datetime import datetime
@@ -50,13 +53,15 @@ class AssignmentResponse(BaseModel):
 # Event schemas
 class EventCreate(BaseModel):
     user_id: str
-    type: str = Field(..., alias="event_type")  # Accept "type" in JSON but map to event_type
+    # NOTE: we accept "type" in JSON but map to event_type internally
+    type: str = Field(..., alias="event_type")
     timestamp: datetime
     properties: Optional[Dict[str, Any]] = None
     experiment_id: Optional[int] = None
     
     class Config:
-        populate_by_name = True  # Allow both "type" and "event_type"
+        # Allow both "type" and "event_type"
+        populate_by_name = True
 
 
 class EventResponse(BaseModel):

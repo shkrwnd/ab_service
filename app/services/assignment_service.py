@@ -1,5 +1,6 @@
 """Service for handling user assignments - ensures idempotency"""
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.exc import DetachedInstanceError
 from fastapi import HTTPException
 from app.models import Experiment, Variant, UserAssignment
 from app.utils.assignment import hash_user_experiment, assign_variant
@@ -48,11 +49,18 @@ def get_or_create_assignment(
             raise HTTPException(status_code=404, detail="Experiment not found")
         set_experiment(experiment_id, experiment)
 
-    # Always enforce experiment status (even if experiment came from cache)
-    if experiment.status != "active":
+    # Always enforce experiment status (even if experiment came from cache).
+    # NOTE: cached ORM instances can be detached from the current Session, so
+    # accessing attributes can raise DetachedInstanceError. Fetch status safely.
+    try:
+        status = experiment.status
+    except DetachedInstanceError:
+        status = db.query(Experiment.status).filter(Experiment.id == experiment_id).scalar()
+
+    if status != "active":
         raise HTTPException(
             status_code=400,
-            detail=f"Experiment is not active (status: {experiment.status})"
+            detail=f"Experiment is not active (status: {status})"
         )
     
     # Get variants for this experiment

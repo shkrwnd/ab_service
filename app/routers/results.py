@@ -1,4 +1,7 @@
-"""Results/analytics endpoints"""
+"""Results/analytics endpoints.
+
+Returns aggregated stats for an experiment.
+"""
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from datetime import datetime
@@ -33,6 +36,7 @@ def get_results_endpoint(
     - Conversion rates
     - Comparison/lift metrics between variants
     """
+    # actual calculations are inside the service
     results = get_experiment_results(
         db=db,
         experiment_id=experiment_id,

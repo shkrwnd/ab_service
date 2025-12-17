@@ -1,4 +1,7 @@
-"""Pytest fixtures for testing"""
+"""Pytest fixtures for testing.
+
+Mostly DB setup + a sample experiment.
+"""
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -8,7 +11,7 @@ from fastapi.testclient import TestClient
 from app.main import app
 
 
-# Test database - use in-memory SQLite
+# Test database - use sqlite (file) for tests
 SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
 
 engine = create_engine(

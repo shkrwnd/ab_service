@@ -1,4 +1,7 @@
-"""Service for calculating and aggregating experiment results"""
+"""Service for calculating and aggregating experiment results.
+
+This is the "analytics" logic.
+"""
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, case
 from datetime import datetime

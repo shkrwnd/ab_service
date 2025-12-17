@@ -1,4 +1,7 @@
-"""Simple in-memory cache with TTL - could swap to Redis later if needed"""
+"""Simple in-memory cache with TTL.
+
+This is in-memory only. Could swap to Redis later if needed.
+"""
 from typing import Optional, Any
 from cachetools import TTLCache
 from app.config import settings

@@ -1,4 +1,7 @@
-"""Helper functions for deterministic user assignment"""
+"""Helper functions for deterministic user assignment.
+
+This does a basic hash and then picks a variant based on traffic %.
+"""
 import hashlib
 
 

@@ -1,4 +1,7 @@
-"""Tests for event recording"""
+"""Tests for event recording.
+
+Just basic tests for event create + batch create.
+"""
 import pytest
 from datetime import datetime
 from app.models import Event

@@ -1,4 +1,7 @@
-"""Database setup and session management"""
+"""Database setup and session management.
+
+Right now it's just SQLAlchemy + SQLite (unless DATABASE_URL is changed).
+"""
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
@@ -16,7 +19,7 @@ Base = declarative_base()
 
 
 def get_db():
-    """Dependency for getting DB session"""
+    """Dependency for getting DB session (FastAPI Depends)."""
     db = SessionLocal()
     try:
         yield db
@@ -25,6 +28,6 @@ def get_db():
 
 
 def init_db():
-    """Initialize database tables"""
+    """Initialize database tables (create_all)."""
     Base.metadata.create_all(bind=engine)
 

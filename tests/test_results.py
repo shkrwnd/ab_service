@@ -1,4 +1,7 @@
-"""Tests for results calculation"""
+"""Tests for results calculation.
+
+These tests check the rules like "only events after assignment count".
+"""
 import pytest
 from datetime import datetime, timedelta
 from app.models import UserAssignment, Event

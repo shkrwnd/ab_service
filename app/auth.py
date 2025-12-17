@@ -1,4 +1,7 @@
-"""Bearer token authentication - simple but effective"""
+"""Bearer token authentication.
+
+This is very simple token checking (not full user auth).
+"""
 from fastapi import HTTPException, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.config import settings

@@ -1,4 +1,7 @@
-"""SQLAlchemy models for experiments, variants, assignments, and events"""
+"""SQLAlchemy models for experiments, variants, assignments, and events.
+
+These map to the tables in SQLite.
+"""
 from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text, Index
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -12,7 +15,8 @@ class Experiment(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, nullable=False, index=True)
     description = Column(Text, nullable=True)
-    status = Column(String, default="draft", index=True)  # draft, active, paused, completed
+    # status values are like: draft, active, paused, completed
+    status = Column(String, default="draft", index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     

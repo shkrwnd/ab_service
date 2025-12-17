@@ -20,7 +20,8 @@ def get_experiment_results(
     end_date: Optional[datetime] = None,
     event_type: Optional[str] = None,
     variant_id: Optional[int] = None,
-    primary_event_type: Optional[str] = None
+    primary_event_type: Optional[str] = None,
+    group_by: Optional[str] = None
 ) -> ExperimentResults:
     """
     Calculate experiment results with various filters.
@@ -71,6 +72,10 @@ def get_experiment_results(
     # events_query = events_query.limit(1000)
     
     event_results = events_query.all()
+
+    # Validate grouping param early
+    if group_by not in (None, "day", "hour"):
+        raise HTTPException(status_code=400, detail="group_by must be one of: day, hour")
     
     variant_metrics_list = []
     total_assigned = 0
@@ -143,37 +148,41 @@ def get_experiment_results(
             "end": end_date.isoformat() if end_date else None
         }
     }
-    
-    comparison = None
-    if len(variant_metrics_list) >= 2:
-        baseline = variant_metrics_list[0]
-        treatment = variant_metrics_list[1]
-        
-        if baseline.conversion_rate > 0:
-            lift = ((treatment.conversion_rate - baseline.conversion_rate) / baseline.conversion_rate) * 100
+
+    # Stats helper: baseline vs variant (two-proportion z-test)
+    def _norm_cdf(z: float) -> float:
+        return 0.5 * (1.0 + math.erf(z / math.sqrt(2.0)))
+
+    def _compare_variants(baseline: VariantMetrics, treatment: VariantMetrics) -> Dict[str, Any]:
+        # Choose which conversion to use: primary (if requested) otherwise default.
+        if primary_event_type:
+            x1 = baseline.primary_unique_users or 0
+            n1 = baseline.assigned_count
+            x2 = treatment.primary_unique_users or 0
+            n2 = treatment.assigned_count
+            p1 = baseline.primary_conversion_rate or 0.0
+            p2 = treatment.primary_conversion_rate or 0.0
         else:
-            lift = 0.0 if treatment.conversion_rate == 0 else float('inf')
+            x1 = baseline.unique_users_with_events
+            n1 = baseline.assigned_count
+            x2 = treatment.unique_users_with_events
+            n2 = treatment.assigned_count
+            p1 = baseline.conversion_rate
+            p2 = treatment.conversion_rate
 
-        # --- Statistical significance (two-proportion z-test) ---
-        x1 = baseline.unique_users_with_events
-        n1 = baseline.assigned_count
-        x2 = treatment.unique_users_with_events
-        n2 = treatment.assigned_count
+        # Lift based on chosen conversion rate
+        if p1 > 0:
+            lift = ((p2 - p1) / p1) * 100
+        else:
+            lift = 0.0 if p2 == 0 else float('inf')
 
-        alpha = 0.05  # 95% confidence
-
-        def _norm_cdf(z: float) -> float:
-            return 0.5 * (1.0 + math.erf(z / math.sqrt(2.0)))
-
+        alpha = 0.05
         z_score = None
         p_value = None
         significant = None
-        conf_int_95 = None  # CI for (p2 - p1)
+        conf_int_95 = None
 
         if n1 > 0 and n2 > 0:
-            p1 = x1 / n1
-            p2 = x2 / n2
-
             # pooled proportion for z-test
             p_pool = (x1 + x2) / (n1 + n2)
             se = math.sqrt(max(p_pool * (1.0 - p_pool) * (1.0 / n1 + 1.0 / n2), 0.0))
@@ -190,9 +199,11 @@ def get_experiment_results(
                 hi = (p2 - p1) + z_crit * se_diff
                 conf_int_95 = {"diff_low": round(lo, 6), "diff_high": round(hi, 6)}
 
-        comparison = {
+        return {
             "baseline": baseline.variant_name,
+            "baseline_variant_id": baseline.variant_id,
             "treatment": treatment.variant_name,
+            "treatment_variant_id": treatment.variant_id,
             "lift_percentage": round(lift, 2),
             "alpha": alpha,
             "baseline_assigned": n1,
@@ -203,7 +214,75 @@ def get_experiment_results(
             "p_value": None if p_value is None else round(p_value, 8),
             "significant": significant,
             "conversion_rate_diff_ci_95": conf_int_95,
+            "metric": primary_event_type or "any_event",
         }
+
+    # Multi-variant comparisons (each vs baseline)
+    comparisons = None
+    comparison = None  # keep old field for backwards compatibility (baseline vs first treatment)
+    if len(variant_metrics_list) >= 2:
+        baseline = variant_metrics_list[0]
+        comparisons = []
+        for vm in variant_metrics_list[1:]:
+            comparisons.append(_compare_variants(baseline, vm))
+
+        comparison = comparisons[0] if comparisons else None
+
+    # Time-series aggregation (optional)
+    timeseries = None
+    if group_by in ("day", "hour"):
+        # Pull assignments for bucketing assigned users
+        assignments_q = db.query(UserAssignment).filter(UserAssignment.experiment_id == experiment_id)
+        if variant_id:
+            assignments_q = assignments_q.filter(UserAssignment.variant_id == variant_id)
+        assignments = assignments_q.all()
+
+        def _bucket_key(dt: datetime) -> str:
+            if group_by == "hour":
+                return dt.replace(minute=0, second=0, microsecond=0).isoformat()
+            return dt.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+
+        # assigned per bucket + variant
+        assigned_by_bucket: Dict[str, Dict[int, int]] = {}
+        for a in assignments:
+            b = _bucket_key(a.assigned_at)
+            assigned_by_bucket.setdefault(b, {})
+            assigned_by_bucket[b][a.variant_id] = assigned_by_bucket[b].get(a.variant_id, 0) + 1
+
+        # conversions/events per bucket + variant (from event_results)
+        events_by_bucket: Dict[str, Dict[int, int]] = {}
+        conv_users_by_bucket: Dict[str, Dict[int, set]] = {}
+        for e, assigned_at, v_id in event_results:
+            b = _bucket_key(e.timestamp)
+            events_by_bucket.setdefault(b, {})
+            events_by_bucket[b][v_id] = events_by_bucket[b].get(v_id, 0) + 1
+
+            # conversion user tracking (primary if requested, otherwise any event)
+            if (primary_event_type is None) or (e.event_type == primary_event_type):
+                conv_users_by_bucket.setdefault(b, {})
+                conv_users_by_bucket[b].setdefault(v_id, set())
+                conv_users_by_bucket[b][v_id].add(e.user_id)
+
+        # Build rows sorted by time
+        all_buckets = sorted(set(assigned_by_bucket.keys()) | set(events_by_bucket.keys()) | set(conv_users_by_bucket.keys()))
+        timeseries = []
+        for b in all_buckets:
+            row = {"bucket": b, "group_by": group_by, "metric": primary_event_type or "any_event", "variants": []}
+            for v in variants:
+                a_cnt = assigned_by_bucket.get(b, {}).get(v.id, 0)
+                e_cnt = events_by_bucket.get(b, {}).get(v.id, 0)
+                conv_users = conv_users_by_bucket.get(b, {}).get(v.id, set())
+                conv_cnt = len(conv_users)
+                rate = (conv_cnt / a_cnt) if a_cnt > 0 else 0.0
+                row["variants"].append({
+                    "variant_id": v.id,
+                    "variant_name": v.name,
+                    "assigned": a_cnt,
+                    "events": e_cnt,
+                    "conversions": conv_cnt,
+                    "conversion_rate": round(rate, 4),
+                })
+            timeseries.append(row)
     
     experiment_response = ExperimentResponse(
         id=experiment.id,
@@ -223,7 +302,9 @@ def get_experiment_results(
         experiment=experiment_response,
         summary=summary,
         variants=variant_metrics_list,
-        comparison=comparison
+        comparison=comparison,
+        comparisons=comparisons,
+        timeseries=timeseries
     )
 
     # return ExperimentResults(experiment=experiment_response, summary=summary, variants=[], comparison=None)

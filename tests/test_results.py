@@ -226,3 +226,44 @@ def test_results_comparison(db, sample_experiment):
     assert "z_score" in results.comparison
     assert "significant" in results.comparison
 
+    # Multi-variant comparisons should be present too
+    assert results.comparisons is not None
+    assert len(results.comparisons) >= 1
+    assert all("p_value" in c for c in results.comparisons)
+    assert all("treatment_variant_id" in c for c in results.comparisons)
+
+
+def test_results_timeseries_group_by_day(db, sample_experiment):
+    """Basic timeseries output with group_by=day"""
+    experiment_id = sample_experiment.id
+
+    # Create a couple assignments and move them across days
+    a1 = get_or_create_assignment(db, experiment_id, "ts_user_1")
+    a2 = get_or_create_assignment(db, experiment_id, "ts_user_2")
+
+    # Put one assignment "yesterday"
+    yesterday = a1.assigned_at - timedelta(days=1)
+    a1.assigned_at = yesterday
+    db.add(a1)
+    db.commit()
+    db.refresh(a1)
+
+    # Events after assignment so they count
+    create_event(db, EventCreate(
+        user_id=a1.user_id,
+        type="purchase",
+        timestamp=a1.assigned_at + timedelta(minutes=10),
+        experiment_id=experiment_id
+    ))
+    create_event(db, EventCreate(
+        user_id=a2.user_id,
+        type="purchase",
+        timestamp=a2.assigned_at + timedelta(minutes=10),
+        experiment_id=experiment_id
+    ))
+
+    results = get_experiment_results(db, experiment_id, group_by="day", primary_event_type="purchase")
+    assert results.timeseries is not None
+    assert len(results.timeseries) >= 1
+    assert results.timeseries[0]["group_by"] == "day"
+

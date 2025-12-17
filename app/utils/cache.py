@@ -1,10 +1,11 @@
-"""Simple in-memory cache with TTL.
 
-This is in-memory only. Could swap to Redis later if needed.
-"""
 from typing import Optional, Any
 from cachetools import TTLCache
 from app.config import settings
+
+# # from cachetools import LRUCache
+# # import time
+# # from typing import Callable
 
 
 # Cache for user assignments - key: "assignment:{experiment_id}:{user_id}"
@@ -48,4 +49,9 @@ def clear_experiment_cache(experiment_id: int):
     """Clear cached experiment (e.g., when updated)"""
     key = f"experiment:{experiment_id}"
     experiment_cache.pop(key, None)
+
+    # experiment_cache.clear()
+
+# def cache_info():
+#     return {"assignments": len(assignment_cache), "experiments": len(experiment_cache)}
 

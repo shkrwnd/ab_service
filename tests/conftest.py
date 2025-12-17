@@ -1,7 +1,4 @@
-"""Pytest fixtures for testing.
 
-Mostly DB setup + a sample experiment.
-"""
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -11,7 +8,6 @@ from fastapi.testclient import TestClient
 from app.main import app
 
 
-# Test database - use sqlite (file) for tests
 SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
 
 engine = create_engine(
@@ -48,7 +44,6 @@ def client(db):
 
 @pytest.fixture
 def sample_experiment(db):
-    """Create a sample experiment with variants for testing"""
     experiment = Experiment(
         name="Test Experiment",
         description="A test experiment",

@@ -1,16 +1,22 @@
-"""Configuration management.
 
-Reads settings from env vars. This is intentionally simple.
-"""
 import os
 from typing import List
 from dotenv import load_dotenv
 
 load_dotenv()
 
+# def _env(key: str, default: str) -> str:
+#     v = os.getenv(key)
+#     return v if v is not None else default
+#
+# def _env_int(key: str, default: int) -> int:
+#     try:
+#         return int(os.getenv(key, str(default)))
+#     except ValueError:
+#         return default
+
 
 class Settings:
-    """App settings loaded from environment variables"""
     
     # API tokens - comma separated list
     api_tokens: List[str] = os.getenv(
@@ -18,7 +24,6 @@ class Settings:
         "default-dev-token"
     ).split(",")
     
-    # Database
     database_url: str = os.getenv(
         "DATABASE_URL", 
         "sqlite:///./ab_testing.db"
@@ -34,4 +39,6 @@ class Settings:
 
 
 settings = Settings()
+
+# settings = Settings()
 

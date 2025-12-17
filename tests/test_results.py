@@ -12,7 +12,6 @@ from app.schemas import EventCreate
 
 
 def test_results_only_counts_events_after_assignment(db, sample_experiment):
-    """Test that results only count events after assignment timestamp"""
     user_id = "results_user"
     experiment_id = sample_experiment.id
     
@@ -38,10 +37,8 @@ def test_results_only_counts_events_after_assignment(db, sample_experiment):
     )
     create_event(db, event_after)
     
-    # Get results
     results = get_experiment_results(db, experiment_id)
     
-    # Find the variant this user was assigned to
     variant_metrics = next(
         (v for v in results.variants if v.variant_id == assignment.variant_id),
         None
@@ -74,7 +71,6 @@ def test_results_conversion_rate(db, sample_experiment):
 
         assigned_to_variant += 1
 
-        # Only 5 users (of the 10 assigned to this variant) have events
         if assigned_to_variant <= 5:
             event = EventCreate(
                 user_id=user_id,

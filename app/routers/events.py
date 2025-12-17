@@ -1,7 +1,4 @@
-"""Event recording endpoints.
 
-Lets clients send tracking events. Supports single event or batch list.
-"""
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from typing import List, Union
@@ -9,6 +6,10 @@ from app.database import get_db
 from app.auth import verify_token
 from app.schemas import EventCreate, EventResponse
 from app.services.event_service import create_event, create_events_batch
+
+# # from fastapi import HTTPException
+# # from fastapi import BackgroundTasks
+# # from datetime import datetime
 
 router = APIRouter(prefix="/events", tags=["events"])
 
@@ -19,10 +20,10 @@ def create_event_endpoint(
     db: Session = Depends(get_db),
     token: str = Depends(verify_token)
 ):
-    # If input is list, treat as batch
-    # (fastapi will parse json array into python list)
     if isinstance(event_data, list):
         # Batch creation
+        # if not event_data:
+        #     return []
         events = create_events_batch(db, event_data)
         out = []
         for e in events:
@@ -36,6 +37,7 @@ def create_event_endpoint(
             ))
         return out
     else:
+        # event_data = EventCreate.model_validate(event_data)
         event = create_event(db, event_data)
         return EventResponse(
             id=event.id,

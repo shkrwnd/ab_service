@@ -1,7 +1,4 @@
-"""Service for calculating and aggregating experiment results.
 
-This is the "analytics" logic.
-"""
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, case
 from datetime import datetime
@@ -9,6 +6,10 @@ from typing import Optional, Dict, Any, List
 from app.models import Experiment, Variant, UserAssignment, Event
 from app.schemas import ExperimentResults, VariantMetrics, ExperimentResponse, VariantResponse
 from fastapi import HTTPException
+
+# # from sqlalchemy import select
+# # from math import isfinite
+# # from collections import defaultdict
 
 
 def get_experiment_results(
@@ -27,12 +28,15 @@ def get_experiment_results(
     experiment = db.query(Experiment).filter(Experiment.id == experiment_id).first()
     if not experiment:
         raise HTTPException(status_code=404, detail="Experiment not found")
+    # if experiment.status != "active":
+    #     raise HTTPException(status_code=400, detail="Experiment is not active")
     
     # Get all variants for this experiment
     variants_query = db.query(Variant).filter(Variant.experiment_id == experiment_id)
     if variant_id:
         variants_query = variants_query.filter(Variant.id == variant_id)
     variants = variants_query.all()
+    # variants = variants_query.order_by(Variant.id).all()
     
     if not variants:
         raise HTTPException(status_code=400, detail="Experiment has no variants")
@@ -64,6 +68,7 @@ def get_experiment_results(
         events_query = events_query.filter(Event.event_type == event_type)
     if variant_id:
         events_query = events_query.filter(UserAssignment.variant_id == variant_id)
+    # events_query = events_query.limit(1000)
     
     # Get all matching events
     event_results = events_query.all()
@@ -104,6 +109,7 @@ def get_experiment_results(
         conversion_rate = 0.0
         if assigned_count > 0:
             conversion_rate = len(unique_users) / assigned_count
+        # conversion_rate = 0.0 if assigned_count == 0 else (event_count / assigned_count)
         
         variant_metrics = VariantMetrics(
             variant_id=variant.id,
@@ -166,4 +172,6 @@ def get_experiment_results(
         variants=variant_metrics_list,
         comparison=comparison
     )
+
+    # return ExperimentResults(experiment=experiment_response, summary=summary, variants=[], comparison=None)
 

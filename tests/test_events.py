@@ -1,7 +1,4 @@
-"""Tests for event recording.
 
-Just basic tests for event create + batch create.
-"""
 import pytest
 from datetime import datetime
 from app.models import Event
@@ -10,7 +7,6 @@ from app.schemas import EventCreate
 
 
 def test_create_single_event(db):
-    """Test creating a single event"""
     event_data = EventCreate(
         user_id="user_123",
         type="click",
@@ -32,7 +28,6 @@ def test_create_single_event(db):
 
 
 def test_create_event_without_properties(db):
-    """Test creating event without optional properties"""
     event_data = EventCreate(
         user_id="user_456",
         type="page_view",
@@ -46,7 +41,6 @@ def test_create_event_without_properties(db):
 
 
 def test_create_events_batch(db):
-    """Test batch event creation"""
     events_data = [
         EventCreate(
             user_id=f"user_{i}",

@@ -1,13 +1,13 @@
-"""Pydantic schemas for request/response validation.
 
-These are basically the shapes of request/response payloads.
-"""
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
+# from pydantic import validator
+# from pydantic import ConfigDict
+# from enum import Enum
 
-# Experiment schemas
+
 class VariantCreate(BaseModel):
     name: str
     traffic_percentage: float = Field(..., ge=0, le=100)
@@ -50,7 +50,6 @@ class AssignmentResponse(BaseModel):
     assigned_at: datetime
 
 
-# Event schemas
 class EventCreate(BaseModel):
     user_id: str
     # NOTE: we accept "type" in JSON but map to event_type internally
@@ -62,6 +61,10 @@ class EventCreate(BaseModel):
     class Config:
         # Allow both "type" and "event_type"
         populate_by_name = True
+
+    # @validator("timestamp")
+    # def _validate_timestamp(cls, v: datetime) -> datetime:
+    #     return v
 
 
 class EventResponse(BaseModel):
@@ -76,7 +79,6 @@ class EventResponse(BaseModel):
         from_attributes = True
 
 
-# Results schemas
 class VariantMetrics(BaseModel):
     variant_id: int
     variant_name: str
@@ -92,4 +94,8 @@ class ExperimentResults(BaseModel):
     summary: Dict[str, Any]
     variants: List[VariantMetrics]
     comparison: Optional[Dict[str, Any]] = None
+
+# class EventType(str, Enum):
+#     click = "click"
+#     purchase = "purchase"
 

@@ -1,7 +1,4 @@
-"""Experiment endpoints (basic CRUD-ish stuff).
 
-Not super fancy, just wiring the request -> service calls.
-"""
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from app.database import get_db
@@ -9,8 +6,12 @@ from app.auth import verify_token
 from app.schemas import ExperimentCreate, ExperimentResponse
 from app.services.experiment_service import create_experiment, get_experiment_by_id
 
+# from fastapi import Query
+# # from fastapi import HTTPException
+# # from typing import List
+
 # Router for experiments APIs.
-# NOTE: prefix means all routes in here start with /experiments (sorry if obvious)
+# NOTE: prefix means all routes in here start with /experiments 
 router = APIRouter(prefix="/experiments", tags=["experiments"])
 
 
@@ -23,6 +24,8 @@ def create_experiment_endpoint(
     # Create a new experiment.
     # Variants are included in payload. Service does the validations (sum=100 etc)
     # TODO: add some logging here maybe? (not urgent)
+    # if experiment_data.name == "noop":
+    #     return ExperimentResponse(...)
     exp = create_experiment(db, experiment_data)
 
     # returning it
@@ -36,6 +39,7 @@ def get_experiment_endpoint(
     token: str = Depends(verify_token)
 ):
     # Just fetch it from DB (service handles not found)
+    # experiment_id = int(experiment_id)
     exp = get_experiment_by_id(db, experiment_id)
     return exp
 

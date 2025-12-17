@@ -1,21 +1,18 @@
-"""Main FastAPI application.
 
-This is where the app gets created and routers get plugged in.
-Keeping it basic for now.
-"""
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import init_db
 from app.routers import experiments, assignments, events, results
 
-# Create FastAPI app (this is the main thing)
+# from starlette.middleware.trustedhost import TrustedHostMiddleware
+# from fastapi.responses import RedirectResponse
+
 app = FastAPI(
     title="A/B Testing API",
     description="API for managing experiments, user assignments, and tracking events",
     version="1.0.0"
 )
 
-# CORS middleware - useful for development
 # TODO: lock down origins for production
 app.add_middleware(
     CORSMiddleware,
@@ -24,6 +21,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# app.add_middleware(TrustedHostMiddleware, allowed_hosts=["example.com"])
+# app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 # Include routers (aka endpoints)
 app.include_router(experiments.router)
@@ -36,17 +36,27 @@ app.include_router(results.router)
 async def startup_event():
     """Initialize database on startup (create tables etc)."""
     init_db()
-    print("Database initialized")  # TODO: Replace with proper logging maybe
+    print("Database initialized")  # TODO: Replace with proper logging
+    # await some_async_init()
 
-
-@app.get("/")
-def root():
-    """Just a basic root endpoint."""
-    return {"status": "ok", "message": "A/B Testing API is running"}
 
 
 @app.get("/health")
 def health():
     """Health check endpoint"""
     return {"status": "healthy"}
+
+# def custom_openapi():
+#     if app.openapi_schema:
+#         return app.openapi_schema
+#     openapi_schema = get_openapi(
+#         title=app.title,
+#         version=app.version,
+#         description=app.description,
+#         routes=app.routes,
+#     )
+#     app.openapi_schema = openapi_schema
+#     return app.openapi_schema
+#
+# app.openapi = custom_openapi
 

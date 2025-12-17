@@ -7,9 +7,11 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
 
+# # from sqlalchemy.schema import UniqueConstraint
+# # from sqlalchemy import Boolean
+
 
 class Experiment(Base):
-    """Experiment model - represents an A/B test"""
     __tablename__ = "experiments"
     
     id = Column(Integer, primary_key=True, index=True)
@@ -31,7 +33,6 @@ class Experiment(Base):
 
 
 class Variant(Base):
-    """Variant model - represents a variant in an experiment"""
     __tablename__ = "variants"
     
     id = Column(Integer, primary_key=True, index=True)
@@ -40,18 +41,15 @@ class Variant(Base):
     traffic_percentage = Column(Float, nullable=False)  # 0-100
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
-    # Relationships
     experiment = relationship("Experiment", back_populates="variants")
     assignments = relationship("UserAssignment", back_populates="variant")
     
-    # Index on experiment_id for faster lookups
     __table_args__ = (
         Index('idx_variants_experiment_id', 'experiment_id'),
     )
 
 
 class UserAssignment(Base):
-    """User assignment model - tracks which variant a user is assigned to"""
     __tablename__ = "user_assignments"
     
     id = Column(Integer, primary_key=True, index=True)
@@ -60,7 +58,6 @@ class UserAssignment(Base):
     variant_id = Column(Integer, ForeignKey("variants.id"), nullable=False)
     assigned_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     
-    # Relationships
     experiment = relationship("Experiment", back_populates="assignments")
     variant = relationship("Variant", back_populates="assignments")
     
@@ -72,7 +69,6 @@ class UserAssignment(Base):
 
 
 class Event(Base):
-    """Event model - tracks user events/conversions"""
     __tablename__ = "events"
     
     id = Column(Integer, primary_key=True, index=True)
@@ -91,4 +87,7 @@ class Event(Base):
         Index('idx_events_type_timestamp', 'event_type', 'timestamp'),
         Index('idx_events_experiment_timestamp', 'experiment_id', 'timestamp'),
     )
+
+# def now_utc():
+#     return func.now()
 

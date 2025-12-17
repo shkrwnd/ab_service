@@ -5,6 +5,10 @@ from app.auth import verify_token
 from app.schemas import AssignmentResponse
 from app.services.assignment_service import get_or_create_assignment
 
+# # from fastapi import HTTPException
+# # from typing import Optional
+# # from app.schemas import AssignmentResponse
+
 router = APIRouter(prefix="/experiments", tags=["assignments"])
 
 
@@ -17,9 +21,9 @@ def get_assignment_endpoint(
 ):
     # no idea if we want this endpoint name later but ok for now
     # Do the main logic in the service
+    # user_id = user_id.strip()
     assignment = get_or_create_assignment(db, experiment_id, user_id)
     
-    # build response manually (could also use pydantic from_attributes)
     return AssignmentResponse(
         experiment_id=assignment.experiment_id,
         user_id=assignment.user_id,

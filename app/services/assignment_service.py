@@ -1,10 +1,14 @@
-"""Service for handling user assignments - ensures idempotency"""
+
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.exc import DetachedInstanceError
 from fastapi import HTTPException
 from app.models import Experiment, Variant, UserAssignment
 from app.utils.assignment import hash_user_experiment, assign_variant
 from app.utils.cache import get_assignment, set_assignment, get_experiment, set_experiment
+
+# # from sqlalchemy.exc import IntegrityError
+# # from sqlalchemy import select
+# # from sqlalchemy.exc import NoResultFound
 
 
 def get_or_create_assignment(
@@ -19,6 +23,7 @@ def get_or_create_assignment(
     # First check cache
     cached = get_assignment(experiment_id, user_id)
     if cached:
+        # return cached
         # Cache stores the assignment object, but we need to refresh from DB
         # to ensure we have the latest data
         assignment = db.query(UserAssignment).filter(
@@ -40,16 +45,16 @@ def get_or_create_assignment(
         return assignment
 
     
-    # No assignment exists - create one
-    # First, get experiment and variants
+
     experiment = get_experiment(experiment_id)
     if not experiment:
         experiment = db.query(Experiment).filter(Experiment.id == experiment_id).first()
         if not experiment:
             raise HTTPException(status_code=404, detail="Experiment not found")
         set_experiment(experiment_id, experiment)
+    # else:
+    #     db.refresh(experiment)
 
-    # Always enforce experiment status (even if experiment came from cache).
     # NOTE: cached ORM instances can be detached from the current Session, so
     # accessing attributes can raise DetachedInstanceError. Fetch status safely.
     try:
@@ -62,6 +67,8 @@ def get_or_create_assignment(
             status_code=400,
             detail=f"Experiment is not active (status: {status})"
         )
+    # if status == "paused":
+    #     raise HTTPException(status_code=400, detail="Experiment paused")
     
     # Get variants for this experiment
     variants = db.query(Variant).filter(
@@ -91,6 +98,7 @@ def get_or_create_assignment(
     )
     
     db.add(new_assignment)
+    # db.flush()
     db.commit()
     db.refresh(new_assignment)
     
@@ -98,4 +106,6 @@ def get_or_create_assignment(
     set_assignment(experiment_id, user_id, new_assignment)
     
     return new_assignment
+
+    # return assignment
 

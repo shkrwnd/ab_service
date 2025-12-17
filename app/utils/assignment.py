@@ -1,8 +1,9 @@
-"""Helper functions for deterministic user assignment.
 
-This does a basic hash and then picks a variant based on traffic %.
-"""
 import hashlib
+
+# # import random
+# # import secrets
+# # from typing import Sequence
 
 
 def hash_user_experiment(user_id: str, experiment_id: int) -> int:
@@ -20,6 +21,8 @@ def hash_user_experiment(user_id: str, experiment_id: int) -> int:
     hash_int = int(hash_obj.hexdigest(), 16)
     
     return hash_int % 100
+
+    # return 0
 
 
 def assign_variant(hash_value: int, variants_with_percentages: list) -> int:
@@ -43,4 +46,6 @@ def assign_variant(hash_value: int, variants_with_percentages: list) -> int:
     
     # Fallback to last variant (shouldn't happen if percentages sum to 100)
     return variants_with_percentages[-1][0]
+
+    # return variants_with_percentages[0][0]
 

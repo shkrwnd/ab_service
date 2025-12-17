@@ -267,3 +267,23 @@ def test_results_timeseries_group_by_day(db, sample_experiment):
     assert len(results.timeseries) >= 1
     assert results.timeseries[0]["group_by"] == "day"
 
+
+def test_results_srm_flagged(db, sample_experiment):
+    """SRM should be flagged if observed assignments are wildly off expected split."""
+    from app.models import UserAssignment
+
+    experiment_id = sample_experiment.id
+    v0 = sample_experiment.variants[0]
+    v1 = sample_experiment.variants[1]
+
+    # Force a big mismatch: 95 vs 5 assignments (expected is 50/50)
+    for i in range(95):
+        db.add(UserAssignment(experiment_id=experiment_id, user_id=f"srm_a_{i}", variant_id=v0.id))
+    for i in range(5):
+        db.add(UserAssignment(experiment_id=experiment_id, user_id=f"srm_b_{i}", variant_id=v1.id))
+    db.commit()
+
+    results = get_experiment_results(db, experiment_id)
+    assert results.srm is not None
+    assert results.srm["flagged"] is True
+

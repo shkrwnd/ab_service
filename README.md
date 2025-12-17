@@ -7,7 +7,12 @@ A FastAPI-based service for managing A/B tests, user assignments, and tracking e
 - Create experiments with multiple variants and configurable traffic allocation
 - Idempotent user assignment (same user always gets same variant)
 - Flexible event tracking with JSON properties
-- Comprehensive results/analytics endpoint
+- **Comprehensive results/analytics endpoint** with:
+  - Statistical significance testing (z-test, p-values, confidence intervals)
+  - Primary metric analysis (focus on specific event types like "purchase")
+  - Multi-variant comparisons (all variants vs baseline)
+  - Time-series aggregation (daily/hourly trends)
+  - SRM (Sample Ratio Mismatch) detection for traffic split health
 - Bearer token authentication
 - Caching for performance
 - Docker deployment ready
@@ -140,7 +145,7 @@ POST /events
 ### 4. Get Experiment Results
 
 ```bash
-GET /experiments/{experiment_id}/results?start_date=2024-01-01&end_date=2024-01-31&event_type=purchase
+GET /experiments/{experiment_id}/results?start_date=2024-01-01&end_date=2024-01-31&event_type=purchase&primary_event_type=purchase&group_by=day
 ```
 
 **Query Parameters**:
@@ -148,15 +153,25 @@ GET /experiments/{experiment_id}/results?start_date=2024-01-01&end_date=2024-01-
 - `end_date` (optional): Filter events until this date (ISO format)
 - `event_type` (optional): Filter by specific event type
 - `variant_id` (optional): Filter by specific variant
+- `primary_event_type` (optional): Treat this event type as the "conversion" metric (e.g., `purchase`)
+- `group_by` (optional): Time-series aggregation - `day` or `hour` for trend analysis
 
 **Response**:
 ```json
 {
-  "experiment": {...},
+  "experiment": {
+    "id": 1,
+    "name": "Button Color Test",
+    "status": "active",
+    "variants": [...]
+  },
   "summary": {
     "total_assigned": 1000,
     "total_events": 5000,
-    "date_range": {...}
+    "date_range": {
+      "start": "2024-01-01T00:00:00",
+      "end": "2024-01-31T23:59:59"
+    }
   },
   "variants": [
     {
@@ -166,16 +181,70 @@ GET /experiments/{experiment_id}/results?start_date=2024-01-01&end_date=2024-01-
       "event_count": 2500,
       "events_by_type": {"click": 2000, "purchase": 500},
       "conversion_rate": 0.5,
-      "unique_users_with_events": 450
+      "unique_users_with_events": 450,
+      "primary_event_type": "purchase",
+      "primary_event_count": 500,
+      "primary_unique_users": 400,
+      "primary_conversion_rate": 0.8,
+      "primary_events_per_assigned_user": 1.0
     }
   ],
   "comparison": {
     "baseline": "control",
     "treatment": "variant_b",
-    "lift_percentage": 20.0
+    "lift_percentage": 20.0,
+    "z_score": 2.45,
+    "p_value": 0.014,
+    "significant": true,
+    "conversion_rate_diff_ci_95": {"diff_low": 0.02, "diff_high": 0.18}
+  },
+  "comparisons": [
+    {
+      "baseline": "control",
+      "baseline_variant_id": 1,
+      "treatment": "variant_b",
+      "treatment_variant_id": 2,
+      "lift_percentage": 20.0,
+      "p_value": 0.014,
+      "significant": true,
+      "metric": "purchase"
+    }
+  ],
+  "timeseries": [
+    {
+      "bucket": "2024-01-15T00:00:00",
+      "group_by": "day",
+      "metric": "purchase",
+      "variants": [
+        {
+          "variant_id": 1,
+          "variant_name": "control",
+          "assigned": 50,
+          "events": 200,
+          "conversions": 40,
+          "conversion_rate": 0.8
+        }
+      ]
+    }
+  ],
+  "srm": {
+    "total_assigned": 1000,
+    "expected_split_percent": {"1": 50.0, "2": 50.0},
+    "observed_split_percent": {"1": 49.8, "2": 50.2},
+    "chi_square": 0.08,
+    "df": 1,
+    "p_value": 0.78,
+    "flagged": false
   }
 }
 ```
+
+**Key Features**:
+- **Statistical Significance**: `comparison` and `comparisons` include z-test results (p-value, z-score, 95% CI)
+- **Primary Metric**: When `primary_event_type` is set, conversion metrics focus on that event type
+- **Multi-Variant Comparisons**: `comparisons` array shows all variants vs baseline (not just first two)
+- **Time-Series**: `timeseries` array (when `group_by` is used) shows daily/hourly trends per variant
+- **SRM Detection**: `srm` object flags if assignment split deviates from expected traffic allocation (indicates potential bugs)
 
 **Important**: Results only count events that occur **after** a user's assignment timestamp.
 

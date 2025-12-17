@@ -149,6 +149,50 @@ def get_experiment_results(
         }
     }
 
+    # SRM (Sample Ratio Mismatch): expected split (traffic %) vs observed assignments.
+    # Uses chi-square goodness-of-fit; p-value uses Wilson–Hilferty normal approximation (no scipy).
+    srm = None
+    if total_assigned > 0 and len(variants) >= 2:
+        expected_split = {v.id: float(v.traffic_percentage) for v in variants}
+        observed_split = {}
+        chi_square = 0.0
+
+        # observed split based on assignments
+        for vm in variant_metrics_list:
+            observed_split[vm.variant_id] = (vm.assigned_count / total_assigned) * 100.0
+
+        # chi-square stat
+        for vm in variant_metrics_list:
+            exp_cnt = total_assigned * (expected_split.get(vm.variant_id, 0.0) / 100.0)
+            obs_cnt = vm.assigned_count
+            if exp_cnt > 0:
+                chi_square += ((obs_cnt - exp_cnt) ** 2) / exp_cnt
+
+        df = max(len(variant_metrics_list) - 1, 1)
+
+        def _norm_cdf(z: float) -> float:
+            return 0.5 * (1.0 + math.erf(z / math.sqrt(2.0)))
+
+        # Wilson–Hilferty transform to approximate chi-square survival function
+        p_value = None
+        if chi_square >= 0 and df > 0:
+            w = ((chi_square / df) ** (1.0 / 3.0) - (1.0 - 2.0 / (9.0 * df))) / math.sqrt(2.0 / (9.0 * df))
+            # sf = 1 - cdf
+            p_value = 1.0 - _norm_cdf(w)
+
+        # Common SRM threshold in A/B testing is 0.01
+        flagged = (p_value is not None) and (p_value < 0.01)
+
+        srm = {
+            "total_assigned": total_assigned,
+            "expected_split_percent": {str(k): round(v, 4) for k, v in expected_split.items()},
+            "observed_split_percent": {str(k): round(v, 4) for k, v in observed_split.items()},
+            "chi_square": round(chi_square, 6),
+            "df": df,
+            "p_value": None if p_value is None else round(p_value, 8),
+            "flagged": flagged,
+        }
+
     # Stats helper: baseline vs variant (two-proportion z-test)
     def _norm_cdf(z: float) -> float:
         return 0.5 * (1.0 + math.erf(z / math.sqrt(2.0)))
@@ -304,7 +348,8 @@ def get_experiment_results(
         variants=variant_metrics_list,
         comparison=comparison,
         comparisons=comparisons,
-        timeseries=timeseries
+        timeseries=timeseries,
+        srm=srm
     )
 
     # return ExperimentResults(experiment=experiment_response, summary=summary, variants=[], comparison=None)

@@ -102,6 +102,7 @@ class ExperimentResults(BaseModel):
     comparison: Optional[Dict[str, Any]] = None
     comparisons: Optional[List[Dict[str, Any]]] = None
     timeseries: Optional[List[Dict[str, Any]]] = None
+    srm: Optional[Dict[str, Any]] = None
 
 # class EventType(str, Enum):
 #     click = "click"

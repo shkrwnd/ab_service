@@ -30,6 +30,14 @@ Important bits:
 - Core rule: only count events where `event.timestamp ≥ assigned_at`.
 - Returns experiment info + summary totals + per-variant metrics + lift/comparison.
 
+### Primary metric + significance (results)
+
+- **Primary metric**: results can treat one event type (ex: `purchase`) as the main “conversion” metric.
+  - Implemented via `primary_event_type` (query param) and computed per variant:
+    - `primary_event_count`, `primary_unique_users`, `primary_conversion_rate`
+- **Significance**: baseline vs treatment comparison includes a two-proportion z-test:
+  - `z_score`, `p_value`, `significant`, and a 95% CI for the conversion-rate difference.
+
 ## Caching
 
 In-memory TTL cache:

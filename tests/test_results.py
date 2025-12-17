@@ -138,6 +138,48 @@ def test_results_with_date_filter(db, sample_experiment):
     assert total_events == 1
 
 
+def test_results_primary_metric(db, sample_experiment):
+    experiment_id = sample_experiment.id
+
+    variant = sample_experiment.variants[0]
+    assigned_to_variant = 0
+    i = 0
+
+    while assigned_to_variant < 10:
+        user_id = f"pm_user_{i}"
+        assignment = get_or_create_assignment(db, experiment_id, user_id)
+        if assignment.variant_id != variant.id:
+            i += 1
+            continue
+
+        assigned_to_variant += 1
+        if assigned_to_variant <= 5:
+            create_event(db, EventCreate(
+                user_id=user_id,
+                type="purchase",
+                timestamp=assignment.assigned_at + timedelta(minutes=1),
+                experiment_id=experiment_id
+            ))
+        else:
+            # Non-primary event should not count toward primary conversion
+            create_event(db, EventCreate(
+                user_id=user_id,
+                type="click",
+                timestamp=assignment.assigned_at + timedelta(minutes=1),
+                experiment_id=experiment_id
+            ))
+        i += 1
+
+    results = get_experiment_results(db, experiment_id, primary_event_type="purchase")
+    variant_metrics = next((v for v in results.variants if v.variant_id == variant.id), None)
+    assert variant_metrics is not None
+
+    assert variant_metrics.primary_event_type == "purchase"
+    assert variant_metrics.primary_event_count == 5
+    assert variant_metrics.primary_unique_users == 5
+    assert variant_metrics.primary_conversion_rate == 0.5
+
+
 def test_results_comparison(db, sample_experiment):
     """Test that comparison/lift is calculated correctly"""
     experiment_id = sample_experiment.id

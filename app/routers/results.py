@@ -23,7 +23,8 @@ def get_results_endpoint(
     start_date: Optional[datetime] = Query(None, description="Start date for filtering events (ISO format)"),
     end_date: Optional[datetime] = Query(None, description="End date for filtering events (ISO format)"),
     event_type: Optional[str] = Query(None, description="Filter by specific event type"),
-    variant_id: Optional[int] = Query(None, description="Filter by specific variant ID")
+    variant_id: Optional[int] = Query(None, description="Filter by specific variant ID"),
+    primary_event_type: Optional[str] = Query(None, description="Primary conversion event type (e.g. purchase)")
 ):
     # NOTE: only counts events after assignment timestamp (important)
     # if start_date and end_date and start_date > end_date:
@@ -34,7 +35,8 @@ def get_results_endpoint(
         start_date=start_date,
         end_date=end_date,
         event_type=event_type,
-        variant_id=variant_id
+        variant_id=variant_id,
+        primary_event_type=primary_event_type
     )
     
     return results

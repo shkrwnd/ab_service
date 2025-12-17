@@ -19,7 +19,8 @@ def get_experiment_results(
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
     event_type: Optional[str] = None,
-    variant_id: Optional[int] = None
+    variant_id: Optional[int] = None,
+    primary_event_type: Optional[str] = None
 ) -> ExperimentResults:
     """
     Calculate experiment results with various filters.
@@ -31,7 +32,6 @@ def get_experiment_results(
     # if experiment.status != "active":
     #     raise HTTPException(status_code=400, detail="Experiment is not active")
     
-    # Get all variants for this experiment
     variants_query = db.query(Variant).filter(Variant.experiment_id == experiment_id)
     if variant_id:
         variants_query = variants_query.filter(Variant.id == variant_id)
@@ -94,11 +94,17 @@ def get_experiment_results(
         
         events_by_type = {}
         unique_users = set()
+        primary_unique_users = set()
+        primary_event_count = 0
         
         for event, assigned_at, v_id in variant_events:
             event_type = event.event_type
             events_by_type[event_type] = events_by_type.get(event_type, 0) + 1
             unique_users.add(event.user_id)
+
+            if primary_event_type and event.event_type == primary_event_type:
+                primary_event_count += 1
+                primary_unique_users.add(event.user_id)
         
         conversion_rate = 0.0
         if assigned_count > 0:
@@ -112,7 +118,19 @@ def get_experiment_results(
             event_count=event_count,
             events_by_type=events_by_type,
             conversion_rate=round(conversion_rate, 4),
-            unique_users_with_events=len(unique_users)
+            unique_users_with_events=len(unique_users),
+
+            primary_event_type=primary_event_type,
+            primary_event_count=primary_event_count if primary_event_type else None,
+            primary_unique_users=len(primary_unique_users) if primary_event_type else None,
+            primary_conversion_rate=(
+                round((len(primary_unique_users) / assigned_count), 4)
+                if (primary_event_type and assigned_count > 0) else (0.0 if primary_event_type else None)
+            ),
+            primary_events_per_assigned_user=(
+                round((primary_event_count / assigned_count), 4)
+                if (primary_event_type and assigned_count > 0) else (0.0 if primary_event_type else None)
+            ),
         )
         
         variant_metrics_list.append(variant_metrics)

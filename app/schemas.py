@@ -88,6 +88,12 @@ class VariantMetrics(BaseModel):
     conversion_rate: float
     unique_users_with_events: int
 
+    primary_event_type: Optional[str] = None
+    primary_event_count: Optional[int] = None
+    primary_unique_users: Optional[int] = None
+    primary_conversion_rate: Optional[float] = None
+    primary_events_per_assigned_user: Optional[float] = None
+
 
 class ExperimentResults(BaseModel):
     experiment: ExperimentResponse

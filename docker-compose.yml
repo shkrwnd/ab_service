@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - API_TOKEN=${API_TOKEN:-default-dev-token}
+      - DATABASE_URL=sqlite:///./ab_testing.db
+      - CACHE_TTL=3600
+      - CACHE_MAX_SIZE=10000
+    volumes:
+      - ./ab_testing.db:/app/ab_testing.db
+      - .:/app
+    restart: unless-stopped
+

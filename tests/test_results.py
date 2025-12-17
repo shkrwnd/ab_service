@@ -1,0 +1,182 @@
+"""Tests for results calculation"""
+import pytest
+from datetime import datetime, timedelta
+from app.models import UserAssignment, Event
+from app.services.results_service import get_experiment_results
+from app.services.assignment_service import get_or_create_assignment
+from app.services.event_service import create_event
+from app.schemas import EventCreate
+
+
+def test_results_only_counts_events_after_assignment(db, sample_experiment):
+    """Test that results only count events after assignment timestamp"""
+    user_id = "results_user"
+    experiment_id = sample_experiment.id
+    
+    # Create assignment
+    assignment = get_or_create_assignment(db, experiment_id, user_id)
+    assignment_time = assignment.assigned_at
+    
+    # Create event BEFORE assignment (should not be counted)
+    event_before = EventCreate(
+        user_id=user_id,
+        type="click",
+        timestamp=assignment_time - timedelta(hours=1),
+        experiment_id=experiment_id
+    )
+    create_event(db, event_before)
+    
+    # Create event AFTER assignment (should be counted)
+    event_after = EventCreate(
+        user_id=user_id,
+        type="purchase",
+        timestamp=assignment_time + timedelta(hours=1),
+        experiment_id=experiment_id
+    )
+    create_event(db, event_after)
+    
+    # Get results
+    results = get_experiment_results(db, experiment_id)
+    
+    # Find the variant this user was assigned to
+    variant_metrics = next(
+        (v for v in results.variants if v.variant_id == assignment.variant_id),
+        None
+    )
+    
+    assert variant_metrics is not None
+    # Should only count the event after assignment
+    assert variant_metrics.event_count == 1
+    assert variant_metrics.events_by_type.get("purchase", 0) == 1
+    assert variant_metrics.events_by_type.get("click", 0) == 0
+
+
+def test_results_conversion_rate(db, sample_experiment):
+    """Test conversion rate calculation"""
+    experiment_id = sample_experiment.id
+    
+    # Assign 10 users to first variant (keep generating users until we have 10 that land there)
+    variant = sample_experiment.variants[0]
+    users_with_events = []
+    assigned_to_variant = 0
+    i = 0
+    
+    while assigned_to_variant < 10:
+        user_id = f"user_{i}"
+        assignment = get_or_create_assignment(db, experiment_id, user_id)
+        
+        if assignment.variant_id != variant.id:
+            i += 1
+            continue
+
+        assigned_to_variant += 1
+
+        # Only 5 users (of the 10 assigned to this variant) have events
+        if assigned_to_variant <= 5:
+            event = EventCreate(
+                user_id=user_id,
+                type="purchase",
+                timestamp=assignment.assigned_at + timedelta(minutes=1),
+                experiment_id=experiment_id
+            )
+            create_event(db, event)
+            users_with_events.append(user_id)
+        i += 1
+    
+    # Get results
+    results = get_experiment_results(db, experiment_id)
+    
+    variant_metrics = next(
+        (v for v in results.variants if v.variant_id == variant.id),
+        None
+    )
+    
+    assert variant_metrics is not None
+    assert variant_metrics.assigned_count == 10
+    assert variant_metrics.unique_users_with_events == 5
+    # Conversion rate should be 5/10 = 0.5
+    assert variant_metrics.conversion_rate == 0.5
+
+
+def test_results_with_date_filter(db, sample_experiment):
+    """Test results filtering by date range"""
+    user_id = "date_filter_user"
+    experiment_id = sample_experiment.id
+    
+    assignment = get_or_create_assignment(db, experiment_id, user_id)
+    assignment_time = assignment.assigned_at
+    
+    # Create events at different times
+    event1 = EventCreate(
+        user_id=user_id,
+        type="click",
+        timestamp=assignment_time + timedelta(days=1),
+        experiment_id=experiment_id
+    )
+    create_event(db, event1)
+    
+    event2 = EventCreate(
+        user_id=user_id,
+        type="click",
+        timestamp=assignment_time + timedelta(days=5),
+        experiment_id=experiment_id
+    )
+    create_event(db, event2)
+    
+    # Filter to only first 3 days
+    start_date = assignment_time
+    end_date = assignment_time + timedelta(days=3)
+    
+    results = get_experiment_results(
+        db, 
+        experiment_id,
+        start_date=start_date,
+        end_date=end_date
+    )
+    
+    # Should only count event1 (within date range)
+    total_events = sum(v.event_count for v in results.variants)
+    assert total_events == 1
+
+
+def test_results_comparison(db, sample_experiment):
+    """Test that comparison/lift is calculated correctly"""
+    experiment_id = sample_experiment.id
+    
+    # Assign users and create events for both variants
+    variant_a = sample_experiment.variants[0]
+    variant_b = sample_experiment.variants[1]
+    
+    # Variant A: 10 users, 5 conversions (50%)
+    for i in range(10):
+        user_id = f"variant_a_user_{i}"
+        assignment = get_or_create_assignment(db, experiment_id, user_id)
+        if assignment.variant_id == variant_a.id and i < 5:
+            event = EventCreate(
+                user_id=user_id,
+                type="purchase",
+                timestamp=assignment.assigned_at + timedelta(minutes=1),
+                experiment_id=experiment_id
+            )
+            create_event(db, event)
+    
+    # Variant B: 10 users, 7 conversions (70%)
+    for i in range(10):
+        user_id = f"variant_b_user_{i}"
+        assignment = get_or_create_assignment(db, experiment_id, user_id)
+        if assignment.variant_id == variant_b.id and i < 7:
+            event = EventCreate(
+                user_id=user_id,
+                type="purchase",
+                timestamp=assignment.assigned_at + timedelta(minutes=1),
+                experiment_id=experiment_id
+            )
+            create_event(db, event)
+    
+    results = get_experiment_results(db, experiment_id)
+    
+    # Should have comparison data
+    assert results.comparison is not None
+    # Lift should be positive (70% vs 50% = 40% lift)
+    assert results.comparison["lift_percentage"] > 0
+

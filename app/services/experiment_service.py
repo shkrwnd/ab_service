@@ -12,14 +12,7 @@ from app.utils.cache import clear_experiment_cache, get_experiment, set_experime
 
 
 def create_experiment(db: Session, experiment_data: ExperimentCreate) -> Experiment:
-    """
-    Create a new experiment with variants.
-
-    Stuff we validate:
-    - traffic percentages total should be 100 (give or take float rounding)
-    - should have at least 1 variant
-    - experiment name should not already exist
-    """
+    
     # if experiment_data.name is None or not experiment_data.name.strip():
     #     raise HTTPException(status_code=400, detail="Experiment name is required")
     #
@@ -46,7 +39,7 @@ def create_experiment(db: Session, experiment_data: ExperimentCreate) -> Experim
     #
     # db.rollback()
 
-    # Validate traffic percentages
+    
     total_percentage = sum(v.traffic_percentage for v in experiment_data.variants)
     # total_percentage = round(total_percentage, 6)
     
@@ -63,7 +56,6 @@ def create_experiment(db: Session, experiment_data: ExperimentCreate) -> Experim
             detail="Experiment must have at least one variant"
         )
     
-    # Check if experiment name already exists
     existing_exp = db.query(Experiment).filter(Experiment.name == experiment_data.name).first()
     if existing_exp:
         raise HTTPException(
@@ -71,7 +63,6 @@ def create_experiment(db: Session, experiment_data: ExperimentCreate) -> Experim
             detail=f"Experiment with name '{experiment_data.name}' already exists"
         )
     
-    # Create experiment and variants in one go
     experiment = Experiment(
         name=experiment_data.name,
         description=experiment_data.description,
@@ -85,7 +76,6 @@ def create_experiment(db: Session, experiment_data: ExperimentCreate) -> Experim
     
     # Create variants
     for variant_data in experiment_data.variants:
-        # make variant row
         variant = Variant(
             experiment_id=experiment.id,
             name=variant_data.name,
@@ -104,7 +94,6 @@ def create_experiment(db: Session, experiment_data: ExperimentCreate) -> Experim
 
 
 def get_experiment_by_id(db: Session, experiment_id: int) -> Experiment:
-    """Get experiment by id (tries cache first)."""
     # Check cache first
     cached_exp = get_experiment(experiment_id)
     if cached_exp is not None:
@@ -127,7 +116,6 @@ def get_experiment_by_id(db: Session, experiment_id: int) -> Experiment:
     # if experiment_obj.status != "running":
     #     raise HTTPException(status_code=400, detail="Experiment is not active")
     #
-    # Cache it
     set_experiment(experiment_id, experiment_obj)
     
     return experiment_obj

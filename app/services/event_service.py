@@ -12,7 +12,6 @@ from typing import List
 
 def create_event(db: Session, event_data: EventCreate) -> Event:
     """Create a single event"""
-    # Convert properties dict to JSON string for storage (DB stores text)
     properties_json = None
     if event_data.properties:
         properties_json = json.dumps(event_data.properties)
@@ -44,7 +43,6 @@ def create_events_batch(db: Session, events_data: List[EventCreate]) -> List[Eve
     events = []
     
     for event_data in events_data:
-        # basically same logic as single create
         properties_json = None
         if event_data.properties:
             properties_json = json.dumps(event_data.properties)

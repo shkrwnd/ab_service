@@ -24,7 +24,6 @@ def get_experiment_results(
     Calculate experiment results with various filters.
     Only counts events that occur AFTER user's assignment timestamp.
     """
-    # Get experiment
     experiment = db.query(Experiment).filter(Experiment.id == experiment_id).first()
     if not experiment:
         raise HTTPException(status_code=404, detail="Experiment not found")
@@ -41,7 +40,7 @@ def get_experiment_results(
     if not variants:
         raise HTTPException(status_code=400, detail="Experiment has no variants")
     
-    # Build base query for events - only count events after assignment
+
     # This is the key requirement: events must be after assigned_at
     # TODO: Could optimize this query for very large datasets with better indexing
     events_query = db.query(
@@ -70,16 +69,13 @@ def get_experiment_results(
         events_query = events_query.filter(UserAssignment.variant_id == variant_id)
     # events_query = events_query.limit(1000)
     
-    # Get all matching events
     event_results = events_query.all()
     
-    # Calculate metrics per variant
     variant_metrics_list = []
     total_assigned = 0
     total_events = 0
     
     for variant in variants:
-        # Count assigned users for this variant
         assigned_count = db.query(func.count(UserAssignment.id)).filter(
             UserAssignment.experiment_id == experiment_id,
             UserAssignment.variant_id == variant.id
@@ -87,7 +83,6 @@ def get_experiment_results(
         
         total_assigned += assigned_count
         
-        # Filter events for this variant
         variant_events = [
             (e, assigned_at, v_id) for e, assigned_at, v_id in event_results
             if v_id == variant.id
@@ -96,7 +91,6 @@ def get_experiment_results(
         event_count = len(variant_events)
         total_events += event_count
         
-        # Count events by type
         events_by_type = {}
         unique_users = set()
         
@@ -105,7 +99,6 @@ def get_experiment_results(
             events_by_type[event_type] = events_by_type.get(event_type, 0) + 1
             unique_users.add(event.user_id)
         
-        # Calculate conversion rate (users with events / assigned users)
         conversion_rate = 0.0
         if assigned_count > 0:
             conversion_rate = len(unique_users) / assigned_count
@@ -123,7 +116,6 @@ def get_experiment_results(
         
         variant_metrics_list.append(variant_metrics)
     
-    # Build summary
     summary = {
         "total_assigned": total_assigned,
         "total_events": total_events,
@@ -133,10 +125,8 @@ def get_experiment_results(
         }
     }
     
-    # Calculate comparison/lift if we have multiple variants
     comparison = None
     if len(variant_metrics_list) >= 2:
-        # Use first variant as baseline (could be configurable)
         baseline = variant_metrics_list[0]
         treatment = variant_metrics_list[1]
         
@@ -151,7 +141,6 @@ def get_experiment_results(
             "lift_percentage": round(lift, 2)
         }
     
-    # Build experiment response
     experiment_response = ExperimentResponse(
         id=experiment.id,
         name=experiment.name,

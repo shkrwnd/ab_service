@@ -7,7 +7,6 @@ from app.config import settings
 # from sqlalchemy.pool import StaticPool
 # from sqlalchemy.engine import Engine
 
-# Create engine - SQLite for now, easy to swap to Postgres later
 engine = create_engine(
     settings.database_url,
     connect_args={"check_same_thread": False} if "sqlite" in settings.database_url else {}

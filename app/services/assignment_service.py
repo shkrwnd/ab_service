@@ -20,7 +20,6 @@ def get_or_create_assignment(
     Get existing assignment or create new one.
     This is the core idempotent assignment logic.
     """
-    # First check cache
     cached = get_assignment(experiment_id, user_id)
     if cached:
         # return cached
@@ -33,14 +32,12 @@ def get_or_create_assignment(
         if assignment:
             return assignment
     
-    # Check database for existing assignment
     assignment = db.query(UserAssignment).filter(
         UserAssignment.experiment_id == experiment_id,
         UserAssignment.user_id == user_id
     ).first()
     
     if assignment:
-        # Cache it for next time
         set_assignment(experiment_id, user_id, assignment)
         return assignment
 
@@ -55,8 +52,6 @@ def get_or_create_assignment(
     # else:
     #     db.refresh(experiment)
 
-    # NOTE: cached ORM instances can be detached from the current Session, so
-    # accessing attributes can raise DetachedInstanceError. Fetch status safely.
     try:
         status = experiment.status
     except DetachedInstanceError:
@@ -70,7 +65,7 @@ def get_or_create_assignment(
     # if status == "paused":
     #     raise HTTPException(status_code=400, detail="Experiment paused")
     
-    # Get variants for this experiment
+
     variants = db.query(Variant).filter(
         Variant.experiment_id == experiment_id
     ).order_by(Variant.id).all()
@@ -81,16 +76,13 @@ def get_or_create_assignment(
             detail="Experiment has no variants configured"
         )
     
-    # Build list of (variant_id, traffic_percentage) for assignment logic
     variant_percentages = [(v.id, v.traffic_percentage) for v in variants]
     
-    # Generate deterministic hash for this user+experiment
     hash_value = hash_user_experiment(user_id, experiment_id)
     
-    # Assign to variant based on hash and traffic allocation
     variant_id = assign_variant(hash_value, variant_percentages)
     
-    # Create and save assignment
+
     new_assignment = UserAssignment(
         experiment_id=experiment_id,
         user_id=user_id,
@@ -102,7 +94,6 @@ def get_or_create_assignment(
     db.commit()
     db.refresh(new_assignment)
     
-    # Cache the new assignment
     set_assignment(experiment_id, user_id, new_assignment)
     
     return new_assignment

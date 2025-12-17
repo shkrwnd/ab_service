@@ -25,7 +25,6 @@ app.add_middleware(
 # app.add_middleware(TrustedHostMiddleware, allowed_hosts=["example.com"])
 # app.add_middleware(GZipMiddleware, minimum_size=1024)
 
-# Include routers (aka endpoints)
 app.include_router(experiments.router)
 app.include_router(assignments.router)
 app.include_router(events.router)
@@ -46,17 +45,4 @@ def health():
     """Health check endpoint"""
     return {"status": "healthy"}
 
-# def custom_openapi():
-#     if app.openapi_schema:
-#         return app.openapi_schema
-#     openapi_schema = get_openapi(
-#         title=app.title,
-#         version=app.version,
-#         description=app.description,
-#         routes=app.routes,
-#     )
-#     app.openapi_schema = openapi_schema
-#     return app.openapi_schema
-#
-# app.openapi = custom_openapi
 

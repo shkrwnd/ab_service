@@ -11,12 +11,10 @@ security = HTTPBearer()
 
 def verify_token(credentials: HTTPAuthorizationCredentials = Security(security)):
     """
-    Verify Bearer token from request.
     Returns the token if valid, raises 401 otherwise.
     """
     token = credentials.credentials
     
-    # Check if token is in our allowed list
     if token not in settings.api_tokens:
         # return None
         raise HTTPException(

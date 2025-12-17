@@ -6,6 +6,7 @@ from typing import Optional, Dict, Any, List
 from app.models import Experiment, Variant, UserAssignment, Event
 from app.schemas import ExperimentResults, VariantMetrics, ExperimentResponse, VariantResponse
 from fastapi import HTTPException
+import math
 
 # # from sqlalchemy import select
 # # from math import isfinite
@@ -134,11 +135,56 @@ def get_experiment_results(
             lift = ((treatment.conversion_rate - baseline.conversion_rate) / baseline.conversion_rate) * 100
         else:
             lift = 0.0 if treatment.conversion_rate == 0 else float('inf')
-        
+
+        # --- Statistical significance (two-proportion z-test) ---
+        x1 = baseline.unique_users_with_events
+        n1 = baseline.assigned_count
+        x2 = treatment.unique_users_with_events
+        n2 = treatment.assigned_count
+
+        alpha = 0.05  # 95% confidence
+
+        def _norm_cdf(z: float) -> float:
+            return 0.5 * (1.0 + math.erf(z / math.sqrt(2.0)))
+
+        z_score = None
+        p_value = None
+        significant = None
+        conf_int_95 = None  # CI for (p2 - p1)
+
+        if n1 > 0 and n2 > 0:
+            p1 = x1 / n1
+            p2 = x2 / n2
+
+            # pooled proportion for z-test
+            p_pool = (x1 + x2) / (n1 + n2)
+            se = math.sqrt(max(p_pool * (1.0 - p_pool) * (1.0 / n1 + 1.0 / n2), 0.0))
+            if se > 0:
+                z_score = (p2 - p1) / se
+                p_value = 2.0 * (1.0 - _norm_cdf(abs(z_score)))
+                significant = p_value < alpha
+
+            # 95% CI for difference in proportions (unpooled SE)
+            se_diff = math.sqrt(max((p1 * (1.0 - p1) / n1) + (p2 * (1.0 - p2) / n2), 0.0))
+            if se_diff > 0:
+                z_crit = 1.96
+                lo = (p2 - p1) - z_crit * se_diff
+                hi = (p2 - p1) + z_crit * se_diff
+                conf_int_95 = {"diff_low": round(lo, 6), "diff_high": round(hi, 6)}
+
         comparison = {
             "baseline": baseline.variant_name,
             "treatment": treatment.variant_name,
-            "lift_percentage": round(lift, 2)
+            "lift_percentage": round(lift, 2),
+            "alpha": alpha,
+            "baseline_assigned": n1,
+            "treatment_assigned": n2,
+            "baseline_converted": x1,
+            "treatment_converted": x2,
+            "z_score": None if z_score is None else round(z_score, 6),
+            "p_value": None if p_value is None else round(p_value, 8),
+            "significant": significant,
+            "conversion_rate_diff_ci_95": conf_int_95,
         }
     
     experiment_response = ExperimentResponse(

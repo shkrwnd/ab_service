@@ -179,3 +179,8 @@ def test_results_comparison(db, sample_experiment):
     # Lift should be positive (70% vs 50% = 40% lift)
     assert results.comparison["lift_percentage"] > 0
 
+    # Basic sanity checks for significance fields
+    assert "p_value" in results.comparison
+    assert "z_score" in results.comparison
+    assert "significant" in results.comparison
+

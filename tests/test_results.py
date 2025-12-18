@@ -220,6 +220,15 @@ def test_results_comparison(db, sample_experiment):
     assert results.comparison is not None
     # Lift should be positive (70% vs 50% = 40% lift)
     assert results.comparison["lift_percentage"] > 0
+    
+    # Reporting features
+    assert results.insights is not None
+    assert results.recommendation is not None
+    assert results.confidence_level in ["High", "Medium", "Low"]
+    assert results.report_metadata is not None
+    assert "report_generated_at" in results.report_metadata
+    assert results.comparison_matrix is not None
+    assert len(results.comparison_matrix) >= 2
 
     # Basic sanity checks for significance fields
     assert "p_value" in results.comparison

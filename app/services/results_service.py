@@ -328,6 +328,114 @@ def get_experiment_results(
                 })
             timeseries.append(row)
     
+    # Reporting: Executive summary, insights, recommendations
+    insights = None
+    recommendation = None
+    confidence_level = None
+    winning_variant = None
+    comparison_matrix = None
+    
+    if len(variant_metrics_list) >= 2 and comparisons:
+        # Determine winning variant (highest conversion rate, if significant)
+        best_comp = None
+        best_lift = float('-inf')
+        for comp in comparisons:
+            if comp.get("significant") and comp.get("lift_percentage", 0) > best_lift:
+                best_lift = comp["lift_percentage"]
+                best_comp = comp
+        
+        if best_comp:
+            winning_variant_id = best_comp["treatment_variant_id"]
+            winning_vm = next((vm for vm in variant_metrics_list if vm.variant_id == winning_variant_id), None)
+            if winning_vm:
+                winning_variant = {
+                    "variant_id": winning_vm.variant_id,
+                    "variant_name": winning_vm.variant_name,
+                    "conversion_rate": winning_vm.primary_conversion_rate if primary_event_type else winning_vm.conversion_rate,
+                    "lift_percentage": best_comp["lift_percentage"],
+                    "p_value": best_comp["p_value"],
+                    "metric": primary_event_type or "any_event"
+                }
+        
+        baseline = variant_metrics_list[0]
+        metric_name = primary_event_type or "any_event"
+        baseline_rate = baseline.primary_conversion_rate if primary_event_type else baseline.conversion_rate
+        
+        if best_comp:
+            lift = best_comp["lift_percentage"]
+            p_val = best_comp["p_value"]
+            treatment_name = best_comp["treatment"]
+            insights = f"{treatment_name} shows {abs(lift):.1f}% {'increase' if lift > 0 else 'decrease'} in {metric_name} conversion rate vs {baseline.variant_name} ({baseline_rate:.1%} → {baseline_rate * (1 + lift/100):.1%}). "
+            insights += f"Statistically significant (p={p_val:.4f})."
+        elif comparisons:
+            # No significant winner
+            max_lift = max((c.get("lift_percentage", 0) for c in comparisons), default=0)
+            if abs(max_lift) < 5:
+                insights = f"No significant difference between variants. All variants show similar {metric_name} conversion rates (within 5%)."
+            else:
+                best_non_sig = max(comparisons, key=lambda c: c.get("lift_percentage", 0))
+                p_val_str = f"{best_non_sig.get('p_value', 1.0):.4f}" if best_non_sig.get('p_value') is not None else "N/A"
+                insights = f"{best_non_sig['treatment']} shows {best_non_sig['lift_percentage']:.1f}% lift vs {baseline.variant_name}, but not statistically significant (p={p_val_str}). More data needed."
+        
+
+        if best_comp and best_comp.get("significant"):
+            if best_comp["lift_percentage"] > 0:
+                recommendation = f"Launch {best_comp['treatment']} variant. Shows significant positive lift."
+            else:
+                recommendation = f"Keep {baseline.variant_name} (baseline). Treatment shows significant negative impact."
+        elif comparisons:
+            p_values = [c.get("p_value") for c in comparisons if c.get("p_value") is not None]
+            min_p = min(p_values) if p_values else 1.0
+            if min_p < 0.10:  # trending but not significant
+                recommendation = "Continue experiment. Results trending toward significance. Collect more data."
+            else:
+                recommendation = "No clear winner. Continue experiment or consider stopping if sufficient sample size reached."
+        else:
+            recommendation = "Insufficient data for recommendation. Continue experiment."
+        
+        # Determine confidence level
+        if comparisons:
+            has_significant = any(c.get("significant") for c in comparisons)
+            min_sample = min((vm.assigned_count for vm in variant_metrics_list), default=0)
+            p_vals = [c.get("p_value") for c in comparisons if c.get("p_value") is not None]
+            avg_p = sum(p_vals) / len(p_vals) if p_vals else 1.0
+            
+            if has_significant and min_sample >= 100:
+                confidence_level = "High"
+            elif has_significant or (min_sample >= 50 and avg_p < 0.15):
+                confidence_level = "Medium"
+            else:
+                confidence_level = "Low"
+        else:
+            confidence_level = "Low"
+        
+        # Build comparison matrix (table-friendly format)
+        comparison_matrix = []
+        baseline = variant_metrics_list[0]
+        baseline_rate = baseline.primary_conversion_rate if primary_event_type else baseline.conversion_rate
+        
+        for vm in variant_metrics_list:
+            comp = next((c for c in comparisons if c.get("treatment_variant_id") == vm.variant_id), None)
+            row = {
+                "variant_id": vm.variant_id,
+                "variant_name": vm.variant_name,
+                "assigned_count": vm.assigned_count,
+                "conversion_rate": vm.primary_conversion_rate if primary_event_type else vm.conversion_rate,
+                "vs_baseline_lift": comp["lift_percentage"] if comp else 0.0,
+                "vs_baseline_p_value": comp["p_value"] if comp else None,
+                "vs_baseline_significant": comp.get("significant") if comp else False,
+                "metric": primary_event_type or "any_event"
+            }
+            comparison_matrix.append(row)
+    
+    # Report metadata
+    report_metadata = {
+        "report_generated_at": datetime.now().isoformat(),
+        "experiment_status": experiment.status,
+        "data_coverage": round((total_assigned / max(experiment.created_at.timestamp(), 1)) * 100, 2) if total_assigned > 0 else 0.0,
+        "experiment_health": "healthy" if (srm and not srm.get("flagged")) and (total_assigned > 0) else ("warning" if total_assigned == 0 else "critical")
+    }
+    
     experiment_response = ExperimentResponse(
         id=experiment.id,
         name=experiment.name,
@@ -349,7 +457,13 @@ def get_experiment_results(
         comparison=comparison,
         comparisons=comparisons,
         timeseries=timeseries,
-        srm=srm
+        srm=srm,
+        insights=insights,
+        recommendation=recommendation,
+        confidence_level=confidence_level,
+        winning_variant=winning_variant,
+        comparison_matrix=comparison_matrix,
+        report_metadata=report_metadata
     )
 
     # return ExperimentResults(experiment=experiment_response, summary=summary, variants=[], comparison=None)
